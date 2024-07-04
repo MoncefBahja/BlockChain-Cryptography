@@ -62,11 +62,11 @@ class Transaction:
         }
 
 class Block:
-    def __init__(self, previous_hash, transactions, nonce=0):
+    def __init__(self, previous_hash, transactions):
         self.timestamp = time.time()
         self.previous_hash = previous_hash
         self.transactions = transactions  # list of Transaction objects
-        self.nonce = nonce
+        self.nonce = 0  # Initial nonce set to 0
         self.hash = self.compute_hash()
 
     def compute_hash(self):
@@ -79,10 +79,17 @@ class Block:
         block_string = json.dumps(block_dict, sort_keys=True).encode()
         return hashlib.sha256(block_string).hexdigest()
 
+    def mine_block(self, difficulty):
+        while not self.hash.startswith('0' * difficulty):
+            self.nonce += 1
+            self.hash = self.compute_hash()
+        print(f"Block mined: {self.hash}")
+
 class Blockchain:
     def __init__(self):
         self.chain = []
         self.pending_transactions = []
+        self.difficulty = 2  # Set difficulty for mining (number of leading zeros required in hash)
         self.create_genesis_block()
 
     def create_genesis_block(self):
@@ -92,13 +99,14 @@ class Blockchain:
     def add_block(self, block):
         if len(self.chain) > 0:
             block.previous_hash = self.chain[-1].hash
-        block.hash = block.compute_hash()
+        block.mine_block(self.difficulty)
         self.chain.append(block)
 
     def add_transaction(self, sender, recipient, amount, signature, public_key):
         transaction = Transaction(sender, recipient, amount, signature)
         if verify(f'{sender}{recipient}{amount}', signature, public_key):
             self.pending_transactions.append(transaction)
+            print("Transaction added")
             return True
         else:
             print("Invalid transaction")
@@ -106,33 +114,57 @@ class Blockchain:
 
     def mine_pending_transactions(self):
         block = Block(self.chain[-1].hash, self.pending_transactions)
-        self.add_block(block)
+        block.mine_block(self.difficulty)
+        self.chain.append(block)
         self.pending_transactions = []
+
+    def display_blockchain(self):
+        for index, block in enumerate(self.chain):
+            print(f'Block {index}:')
+            print(f'Timestamp: {block.timestamp}')
+            print(f'Previous Hash: {block.previous_hash}')
+            print(f'Hash: {block.hash}')
+            print(f'Nonce: {block.nonce}')
+            print('Transactions:')
+            for tx in block.transactions:
+                print(f'    Sender: {tx.sender}')
+                print(f'    Recipient: {tx.recipient}')
+                print(f'    Amount: {tx.amount}')
+                print(f'    Signature: {tx.signature.hex()}')
+            print('-' * 30)
+
 
 # Usage example
 if __name__ == '__main__':
     pr, pu = generate_keys()
     blockchain = Blockchain()
 
-    message = "Hi I am code eater"
+    message = "Hi I am moncef bahja "
     signature = sign(message, pr)
 
-    sender = "Alice"
-    recipient = "Bob"
+    sender = "moncef"
+    recipient = "mohameden"
     amount = 10
 
     # Sign the transaction
     transaction_signature = sign(f'{sender}{recipient}{amount}', pr)
 
     # Add the transaction to the blockchain
-    if blockchain.add_transaction(sender, recipient, amount, transaction_signature, pu):
-        print("Transaction added")
-    else:
-        print("Transaction failed")
+    blockchain.add_transaction(sender, recipient, amount, transaction_signature, pu)
 
     # Mine a new block
     blockchain.mine_pending_transactions()
 
+    pr1, pu1 = generate_keys()
+    signature = sign(message, pr1)
+    sender = "mohameden"
+    recipient = "moncef"
+    
+    amount = 20
+    transaction_signature = sign(f'{sender}{recipient}{amount}', pr1)
+    blockchain.add_transaction(sender, recipient, amount, transaction_signature, pu1)
+
+    blockchain.mine_pending_transactions()
+
     # Print the blockchain
-    for block in blockchain.chain:
-        print(block.__dict__)
+    blockchain.display_blockchain()
